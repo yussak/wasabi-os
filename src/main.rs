@@ -26,3 +26,59 @@ use core::panic::PanicInfo;
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
+
+#[repr(C)]
+struct EfiBootServicesTable {
+    _reserved0: [u64; 40],
+    locate_protocol: extern "win64" fn(
+        protocol: *const EfiGuid,
+        registration: *const EfiVoid,
+        interface: *mut *mut EfiVoid,
+    ) -> EfiStatus,
+}
+const _: () = assert!(offset_of!(EfiBootServicesTable, locate_protocol) == 320);
+
+const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: EfiGuid = EfiGuid {
+    data0: 0x9042a9de,
+    data1: 0x23dc,
+    data2: 0x4a38,
+    data3: [0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a],
+};
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct EfiGuid {
+    pub data0: u32,
+    pub data1: u16,
+    pub data2: u16,
+    pub data3: [u8; 8],
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocol<'a> {
+    reserved: [u64; 3],
+    pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocolMode<'a> {
+    pub max_mode: u32,
+    pub mode: u32,
+    pub info: &'a EfiGraphicsOutputProtocolPixelInfo,
+    pub size_of_info: u64,
+    pub frame_buffer_base: usize,
+    pub frame_buffer_size: usize,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct EfiGraphicsOutputProtocolPixelInfo {
+    version: u32,
+    pub horizontal_resolution: u32,
+    pub vertical_resolution: u32,
+    _padding0: [u32; 5],
+    pub pixels_per_scan_line: u32,
+}
+const _: () = assert!(size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36);
