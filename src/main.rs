@@ -82,3 +82,25 @@ struct EfiGraphicsOutputProtocolPixelInfo {
     pub pixels_per_scan_line: u32,
 }
 const _: () = assert!(size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36);
+
+// EfiGraphicsOutputProtocolをUEFIから取得
+// <'a>: ライフタイム注釈 - 返す参照の有効期間を呼び出す側が指定できる
+fn locate_graphic_protocol<'a>(
+    // &EfiSystemTable: EfiSystemTableを参照（所有権を移動せず読み取り専用で借用）
+    efi_system_table: &EfiSystemTable,
+    // Result<&'a X>
+    // 成功時の中身がXへの参照（有効期限'a）
+    // XはEfiGraphicsOutputProtocol<'a>型（ライフタイムパラメータ'aを持つ構造体）
+    // なのでResult<&'a X>はEfiGraphicsOutputProtocol<'a>型への参照（有効期限'a）を成功時に返す
+) -> Result<&'a EfiGraphicsOutputProtocol<'a>> {
+    let mut graphic_output_protocol = null_mut::<EfiGraphicsOutputProtocol>();
+    let status = (efi_system_table.boot_services.locate_protocol)(
+        &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
+        null_mut::<EfiVoid>(),
+        &mut graphic_output_protocol as *mut *mut EfiGraphicsOutputProtocol as *mut *mut EfiVoid,
+    );
+    if status != EfiStatus::Success {
+        return Err("Failed to locate graphics output protocol");
+    }
+    Ok(unsafe { &*graphic_output_protocol })
+}
