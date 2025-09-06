@@ -104,3 +104,14 @@ fn locate_graphic_protocol<'a>(
     }
     Ok(unsafe { &*graphic_output_protocol })
 }
+
+type EfiVoid = u8;
+type EfiHandle = u64;
+type Result<T> = core::result::Result<T, &'static str>;
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[must_use]
+#[repr(u64)]
+enum EfiStatus {
+    Success = 0,
+}
