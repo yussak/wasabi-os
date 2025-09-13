@@ -6,31 +6,35 @@
 
 use core::mem::offset_of;
 use core::mem::size_of;
+use core::panic::PanicInfo;
 use core::ptr::null_mut;
 use core::slice;
 
-// 名前修飾（マングリング）の無効化
-#[no_mangle]
-fn efi_main(_image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
-    let efi_graphics_output_protocol = locate_graphic_protocol(efi_system_table).unwrap();
-    let vram_addr = efi_graphics_output_protocol.mode.frame_buffer_base;
-    let vram_byte_size = efi_graphics_output_protocol.mode.frame_buffer_size;
-    let vram = unsafe {
-        slice::from_raw_parts_mut(vram_addr as *mut u32, vram_byte_size / size_of::<u32>())
-    };
-    for e in vram {
-        *e = 0xffffff;
-    }
+type EfiVoid = u8;
+type EfiHandle = u64;
+type Result<T> = core::result::Result<T, &'static str>;
 
-    // println!("Hello, world!");
-    loop {}
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct EfiGuid {
+    pub data0: u32,
+    pub data1: u16,
+    pub data2: u16,
+    pub data3: [u8; 8],
 }
 
-use core::panic::PanicInfo;
+const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: EfiGuid = EfiGuid {
+    data0: 0x9042a9de,
+    data1: 0x23dc,
+    data2: 0x4a38,
+    data3: [0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a],
+};
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[must_use]
+#[repr(u64)]
+enum EfiStatus {
+    Success = 0,
 }
 
 #[repr(C)]
@@ -50,28 +54,16 @@ struct EfiSystemTable {
     pub boot_services: &'static EfiBootServicesTable,
 }
 
-const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: EfiGuid = EfiGuid {
-    data0: 0x9042a9de,
-    data1: 0x23dc,
-    data2: 0x4a38,
-    data3: [0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a],
-};
-
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct EfiGuid {
-    pub data0: u32,
-    pub data1: u16,
-    pub data2: u16,
-    pub data3: [u8; 8],
-}
-
 #[repr(C)]
 #[derive(Debug)]
-struct EfiGraphicsOutputProtocol<'a> {
-    reserved: [u64; 3],
-    pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
+struct EfiGraphicsOutputProtocolPixelInfo {
+    version: u32,
+    pub horizontal_resolution: u32,
+    pub vertical_resolution: u32,
+    _padding0: [u32; 5],
+    pub pixels_per_scan_line: u32,
 }
+const _: () = assert!(size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -86,14 +78,10 @@ struct EfiGraphicsOutputProtocolMode<'a> {
 
 #[repr(C)]
 #[derive(Debug)]
-struct EfiGraphicsOutputProtocolPixelInfo {
-    version: u32,
-    pub horizontal_resolution: u32,
-    pub vertical_resolution: u32,
-    _padding0: [u32; 5],
-    pub pixels_per_scan_line: u32,
+struct EfiGraphicsOutputProtocol<'a> {
+    reserved: [u64; 3],
+    pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
 }
-const _: () = assert!(size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36);
 
 // EfiGraphicsOutputProtocolをUEFIから取得
 // <'a>: ライフタイム注釈 - 返す参照の有効期間を呼び出す側が指定できる
@@ -117,13 +105,24 @@ fn locate_graphic_protocol<'a>(
     Ok(unsafe { &*graphic_output_protocol })
 }
 
-type EfiVoid = u8;
-type EfiHandle = u64;
-type Result<T> = core::result::Result<T, &'static str>;
+// 名前修飾（マングリング）の無効化
+#[no_mangle]
+fn efi_main(_image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
+    let efi_graphics_output_protocol = locate_graphic_protocol(efi_system_table).unwrap();
+    let vram_addr = efi_graphics_output_protocol.mode.frame_buffer_base;
+    let vram_byte_size = efi_graphics_output_protocol.mode.frame_buffer_size;
+    let vram = unsafe {
+        slice::from_raw_parts_mut(vram_addr as *mut u32, vram_byte_size / size_of::<u32>())
+    };
+    for e in vram {
+        *e = 0xffffff;
+    }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-#[must_use]
-#[repr(u64)]
-enum EfiStatus {
-    Success = 0,
+    // println!("Hello, world!");
+    loop {}
+}
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
 }
