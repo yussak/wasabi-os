@@ -209,7 +209,7 @@ pub fn hlt() {
     unsafe { asm!("hlt") };
 }
 
-// 名前修飾（マングリング）の無効化
+// efi_mainのまま呼び出す必要がある
 #[no_mangle]
 fn efi_main(_image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
     let mut vram = init_vram(efi_system_table).expect("init_vram failed");
